@@ -317,6 +317,10 @@ def main():
                     writer.write("%s = %s\n" % (key, str(result[key])))
 
         results.update(result)
+        
+    test_dataloader = trainer.get_test_dataloader(eval_dataset)
+    outputs = trainer.prediction_loop(test_dataloader, description="Prediction", prediction_loss_only=False)
+    print(outputs)
 
     return results
 
