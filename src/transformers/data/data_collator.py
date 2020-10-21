@@ -170,6 +170,26 @@ class DataCollatorForLanguageModeling:
             )
 
         labels = inputs.clone()
+        id_a = self.tokenizer.encode("a")[1]
+        id_the = self.tokenizer.encode("the")[1]
+        id_a2 = self.tokenizer.encode(" a")[1]
+        id_the2 = self.tokenizer.encode(" the")[1]
+
+        # print(id_a, id_the, id_a2, id_the2)
+
+        union_1 = torch.logical_or(labels.eq(id_a), labels.eq(id_the))
+        union_2 = torch.logical_or(labels.eq(id_a2), labels.eq(id_the2))
+        indices_to_replace = torch.logical_or(union_1, union_2)
+        #print(indices_to_replace.sum(-1))
+        #print(labels.eq(id_a).sum(-1) + labels.eq(id_the).sum(-1) + labels.eq(id_a2).sum(-1) + labels.eq(id_the2).sum(-1))
+        labels[~indices_to_replace] = -100 # We only compute loss on masked tokens
+        inputs[indices_to_replace] = self.tokenizer.convert_tokens_to_ids(self.tokenizer.mask_token)
+
+        #print(inputs, labels)
+        return inputs, labels
+        # Never reaches below!
+        # --------------------
+        
         # We sample a few tokens in each sequence for masked-LM training (with probability args.mlm_probability defaults to 0.15 in Bert/RoBERTa)
         probability_matrix = torch.full(labels.shape, self.mlm_probability)
         special_tokens_mask = [
