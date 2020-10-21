@@ -1166,6 +1166,17 @@ class BertForMaskedLM(BertPreTrainedModel):
 
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output)
+        
+        # disambiguate specifics
+        b, t, v = prediction_scores.shape
+        prediction_scores = prediction_scores.view(b * t, v)
+        list_ids = [1037, 1996]
+        indices = torch.tensor(list_ids, device=labels.device)
+        index = torch.index_select(prediction_scores, 1, indices) 
+        indices = indices.unsqueeze(0).repeat(b * t, 1)
+        scores = torch.full((b * t, v), -float("inf"), device=labels.device)
+        scores = scores.scatter_(1, indices, index)
+        # end disambiguate specifics
 
         masked_lm_loss = None
         if labels is not None:
