@@ -272,6 +272,7 @@ class DistributedTensorGatherer:
             self._offsets[i] += slice_len
 
     def _nested_set_tensors(self, storage, arrays):
+        print(storage.shape, arrays.shape)
         if isinstance(arrays, (list, tuple)):
             for x, y in zip(storage, arrays):
                 slice_len = self._nested_set_tensors(x, y)
@@ -281,6 +282,7 @@ class DistributedTensorGatherer:
         ), f"Arrays passed should all have a first dimension multiple of {self.world_size}, found {arrays.shape[0]}."
 
         slice_len = arrays.shape[0] // self.world_size
+        print("slice_len", slice_len)
         for i in range(self.world_size):
             storage[self._offsets[i] : self._offsets[i] + slice_len] = arrays[i * slice_len : (i + 1) * slice_len]
         return slice_len
