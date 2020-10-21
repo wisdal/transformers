@@ -1185,6 +1185,7 @@ class BertForMaskedLM(BertPreTrainedModel):
             loss_fct = CrossEntropyLoss()  # -100 index = padding token
             if disambiguate:
                 masked_lm_loss = loss_fct(scores, labels.view(-1))
+                prediction_scores = scores
             else:
                 masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
 
