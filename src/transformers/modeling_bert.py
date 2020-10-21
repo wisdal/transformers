@@ -1172,7 +1172,7 @@ class BertForMaskedLM(BertPreTrainedModel):
         if disambiguate:
             b, t, v = prediction_scores.shape
             prediction_scores = prediction_scores.view(b * t, v)
-            list_ids = [1037, 1996]
+            list_ids = [1037, 1996]  # "a" and "the"
             indices = torch.tensor(list_ids, device=labels.device)
             index = torch.index_select(prediction_scores, 1, indices) 
             indices = indices.unsqueeze(0).repeat(b * t, 1)
@@ -1185,7 +1185,7 @@ class BertForMaskedLM(BertPreTrainedModel):
             loss_fct = CrossEntropyLoss()  # -100 index = padding token
             if disambiguate:
                 masked_lm_loss = loss_fct(scores, labels.view(-1))
-                prediction_scores = scores.max(-1)[1]
+                prediction_scores = scores.max(-1)[1].view(b, t)
             else:
                 masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
 
