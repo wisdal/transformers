@@ -1452,6 +1452,8 @@ class Trainer:
         logits = nested_detach(logits)
         if len(logits) == 1:
             logits = logits[0]
+            
+        #print(logits)
 
         if has_labels:
             labels = nested_detach(tuple(inputs.get(name) for name in self.label_names))
