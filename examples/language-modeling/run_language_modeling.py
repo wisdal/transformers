@@ -23,6 +23,7 @@ using a masked language modeling (MLM) loss. XLNet is fine-tuned using a permuta
 import logging
 import math
 import os
+import numpy as np
 from dataclasses import dataclass, field
 from glob import glob
 from typing import Optional
@@ -101,6 +102,11 @@ class DataTrainingArguments:
         default=None,
         metadata={"help": "An optional input evaluation data file to evaluate the perplexity on (a text file)."},
     )
+    obf_data_file: Optional[str] = field(
+        default=None,
+        metadata={"help": "An optional input evaluation data file to evaluate the perplexity on (a text file)."},
+    )
+
     line_by_line: bool = field(
         default=False,
         metadata={"help": "Whether distinct lines of text in the dataset are to be handled as distinct sequences."},
@@ -139,6 +145,7 @@ def get_dataset(
     args: DataTrainingArguments,
     tokenizer: PreTrainedTokenizer,
     evaluate: bool = False,
+    obfuscated: bool = False,
     cache_dir: Optional[str] = None,
 ):
     def _dataset(file_path):
@@ -155,6 +162,8 @@ def get_dataset(
 
     if evaluate:
         return _dataset(args.eval_data_file)
+    elif obfuscated:
+        return _dataset(args.obf_data_file)
     elif args.train_data_files:
         return ConcatDataset([_dataset(f) for f in glob(args.train_data_files)])
     else:
@@ -263,6 +272,12 @@ def main():
         if training_args.do_eval
         else None
     )
+    obf_dataset = (
+        get_dataset(data_args, tokenizer=tokenizer, obfuscated=True, cache_dir=model_args.cache_dir)
+        if training_args.do_eval
+        else None
+    )
+
     if config.model_type == "xlnet":
         data_collator = DataCollatorForPermutationLanguageModeling(
             tokenizer=tokenizer,
@@ -299,6 +314,9 @@ def main():
             tokenizer.save_pretrained(training_args.output_dir)
 
     # Evaluation
+    #print(len(eval_dataset))
+    #print(eval_dataset[100])
+    #print(tokenizer.decode(eval_dataset[100], skip_special_tokens=True))
     results = {}
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
@@ -320,8 +338,49 @@ def main():
         
     test_dataloader = trainer.get_test_dataloader(eval_dataset)
     outputs = trainer.prediction_loop(test_dataloader, description="Prediction", prediction_loss_only=False)
-    print(outputs)
+    
+    pred = outputs[0]
+    labels = outputs[1]
 
+    a = 1037  # works only for bert-base models
+    the = 1996  # works only for bert-base models
+
+    not_a_the = ~(np.equal(labels, a) | np.equal(labels, the))
+    dt = eval_dataset.examples
+    x = dt * not_a_the  # "a" and "the" zeroed-out
+
+    a_the = np.equal(labels, a) | np.equal(labels, the)
+    out = x + a_the * pred
+    print("\n")
+    #print(np.array(dt)[3])
+    #print(labels[3])
+    #print(out[3])
+    #print(out)
+
+    test = dt
+    acc = (out == test).sum(-1).sum()/(len(test) * len(test[0]))
+    print(f"**************** Final Accuracy: {acc:.4f} (token-wise)****************")
+    #print("debug acc", (out == test).sum(-1).sum(), len(test) * len(test[0]))
+    with open("/content/plain_output.txt", "w", encoding='utf-8') as writer:
+        for row in out:
+            block = tokenizer.decode(row, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+            writer.write(block)
+
+    obf = obf_dataset.examples
+    total = 0
+    correct = 0
+    with open("/content/output.tsv", "w", encoding='utf-8') as writer:
+        for obf_row, orig_row, pred_row in zip(obf, test, out):
+            obf_list = tokenizer.decode(obf_row, skip_special_tokens=True).split(" ")
+            orig_list = tokenizer.decode(orig_row, skip_special_tokens=True).split(" ")
+            pred_list = tokenizer.decode(pred_row, skip_special_tokens=True).split(" ")
+            total += len(pred_list)
+            for obf_word, orig_word, pred_word in zip(obf_list, orig_list, pred_list):
+                writer.write(f"{orig_word}\t{obf_word}\t{pred_word}\n")
+                correct += (pred_word == orig_word)
+
+    acc = correct/total
+    print(f"**************** Final Accuracy: {acc:.4f} (word-wise)****************")
     return results
 
 
