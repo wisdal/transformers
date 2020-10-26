@@ -374,10 +374,10 @@ def main():
             obf_list = tokenizer.decode(obf_row, skip_special_tokens=True).split(" ")
             orig_list = tokenizer.decode(orig_row, skip_special_tokens=True).split(" ")
             pred_list = tokenizer.decode(pred_row, skip_special_tokens=True).split(" ")
-            total += len(pred_list)
             for obf_word, orig_word, pred_word in zip(obf_list, orig_list, pred_list):
                 writer.write(f"{orig_word}\t{obf_word}\t{pred_word}\n")
-                correct += (pred_word == orig_word)
+                correct += ((orig_word == "a" or orig_word == "the") and (pred_word == orig_word))
+                total += (orig_word == "a" or orig_word == "the")
 
     acc = correct/total
     print(f"**************** Final Accuracy: {acc:.4f} (word-wise)****************")
